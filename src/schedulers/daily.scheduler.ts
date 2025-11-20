@@ -7,13 +7,13 @@ export function startDailyScheduler() {
     console.log('📅 Generating daily challenges...');
 
     try {
-      // Get all users with timezone
+      // Get all users
       const users = await prisma.user.findMany({
         select: { id: true },
       });
 
       // Create daily challenge job for each user
-      const jobs = users.map(user => ({
+      const jobs = users.map((user: any) => ({
         type: 'daily_challenge',
         userId: user.id,
         payload: {},

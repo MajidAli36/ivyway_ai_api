@@ -23,12 +23,12 @@ export async function getProfile(req: AuthRequest, res: Response): Promise<void>
     select: {
       id: true,
       email: true,
-      name: true,
-      role: true,
+      fullName: true,
+      bio: true,
+      profileImage: true,
       language: true,
-      timezone: true,
       createdAt: true,
-      Profile: true,
+      updatedAt: true,
     },
   });
 

@@ -15,7 +15,7 @@ echo ""
 echo "2️⃣  Registering user..."
 REGISTER_RESPONSE=$(curl -s -X POST $BASE_URL/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"manualtest@example.com","password":"password123","name":"Manual Test","role":"student"}')
+  -d '{"email":"manualtest@example.com","password":"password123","fullName":"Manual Test"}')
 
 echo $REGISTER_RESPONSE | jq .
 

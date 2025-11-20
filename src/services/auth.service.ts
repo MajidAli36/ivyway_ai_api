@@ -6,8 +6,7 @@ import { AppError } from '../middlewares/error.middleware';
 export async function registerUser(data: {
   email: string;
   password: string;
-  name: string;
-  role?: string;
+  fullName: string;
 }) {
   const existing = await prisma.user.findUnique({
     where: { email: data.email },
@@ -23,14 +22,12 @@ export async function registerUser(data: {
     data: {
       email: data.email,
       password: hashedPassword,
-      name: data.name,
-      role: data.role as any,
+      fullName: data.fullName,
     },
     select: {
       id: true,
       email: true,
-      name: true,
-      role: true,
+      fullName: true,
       createdAt: true,
     },
   });
@@ -67,8 +64,7 @@ export async function loginUser(data: { email: string; password: string }) {
     user: {
       id: user.id,
       email: user.email,
-      name: user.name,
-      role: user.role,
+      fullName: user.fullName,
     },
     accessToken,
     refreshToken,

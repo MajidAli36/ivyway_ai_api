@@ -20,7 +20,7 @@ const router = Router();
  *             required:
  *               - email
  *               - password
- *               - name
+ *               - fullName
  *             properties:
  *               email:
  *                 type: string
@@ -30,13 +30,9 @@ const router = Router();
  *                 type: string
  *                 minLength: 8
  *                 example: password123
- *               name:
+ *               fullName:
  *                 type: string
  *                 example: John Doe
- *               role:
- *                 type: string
- *                 enum: [student, teacher, admin]
- *                 example: student
  *     responses:
  *       201:
  *         description: User registered successfully

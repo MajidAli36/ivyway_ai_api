@@ -7,12 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  student
-  teacher
-  admin
-}
-
 enum QType {
   MCQ
   TRUE_FALSE
@@ -26,17 +20,16 @@ enum Sender {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(student)
-  timezone  String?
-  language  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  fullName    String
+  bio         String?
+  profileImage String?
+  language    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  Profile            Profile?
   conversations      Conversation[]
   ownedLessons       Lesson[]
   ownedQuizzes       Quiz[]
@@ -45,14 +38,6 @@ model User {
   bookmarks          Bookmark[]
   quizAttempts       QuizAttempt[]
   jobs               Job[]
-}
-
-model Profile {
-  id      String @id @default(cuid())
-  userId  String @unique
-  bio     String?
-  avatar  String?
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Conversation {

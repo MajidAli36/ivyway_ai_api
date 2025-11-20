@@ -36,9 +36,9 @@ const options: swaggerJsdoc.Options = {
           properties: {
             id: { type: 'string', example: 'cuid' },
             email: { type: 'string', example: 'user@example.com' },
-            name: { type: 'string', example: 'John Doe' },
-            role: { type: 'string', enum: ['student', 'teacher', 'admin'], example: 'student' },
-            timezone: { type: 'string', example: 'America/New_York' },
+            fullName: { type: 'string', example: 'John Doe' },
+            bio: { type: 'string', example: 'Student passionate about learning' },
+            profileImage: { type: 'string', example: 'https://example.com/profile.jpg' },
             language: { type: 'string', example: 'en' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },

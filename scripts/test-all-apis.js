@@ -72,8 +72,7 @@ async function runTests() {
       {
         email: 'apitester@example.com',
         password: 'testpass123',
-        name: 'API Test User',
-        role: 'student'
+        fullName: 'API Test User'
       }
     );
     
@@ -98,7 +97,7 @@ async function runTests() {
       null,
       { 'Authorization': `Bearer ${accessToken}` }
     );
-    logSuccess(`Profile retrieved: ${profile.user.name}`);
+    logSuccess(`Profile retrieved: ${profile.user.fullName}`);
 
     // 3. AI Tutor
     log('\n🤖 Testing AI Tutor APIs', colors.yellow);
