@@ -1,0 +1,40 @@
+import { Response } from 'express';
+import { AuthRequest } from '../middlewares/auth.middleware';
+import * as tutorService from '../services/tutor.service';
+
+export async function createConversation(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const { title, language } = req.body;
+
+  const conversation = await tutorService.createConversation(userId, title, language);
+  res.status(201).json({ conversation });
+}
+
+export async function getConversations(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const limit = parseInt(req.query.limit as string) || 20;
+  const offset = parseInt(req.query.offset as string) || 0;
+
+  const conversations = await tutorService.getUserConversations(userId, limit, offset);
+  res.json({ conversations });
+}
+
+export async function getMessages(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const { conversationId } = req.params;
+  const limit = parseInt(req.query.limit as string) || 25;
+  const offset = parseInt(req.query.offset as string) || 0;
+
+  const messages = await tutorService.getConversationMessages(conversationId, userId, limit, offset);
+  res.json({ messages });
+}
+
+export async function sendMessage(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const { conversationId } = req.params;
+  const { content, language } = req.body;
+
+  const result = await tutorService.sendMessage(userId, conversationId || null, content, language);
+  res.status(201).json(result);
+}
+

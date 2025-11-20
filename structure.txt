@@ -1,0 +1,91 @@
+Folder PATH listing for volume New Volume
+Volume serial number is EE94-372A
+E:.
+|   .eslintrc.json
+|   .gitignore
+|   .nodemon.json
+|   docker-compose.yml
+|   Dockerfile
+|   env
+|   package.json
+|   PROJECT_SUMMARY.md
+|   QUICK_START.md
+|   README.md
+|   SETUP.md
+|   structure.txt
+|   tsconfig.json
+|   vitest.config.ts
+|   
++---prisma
+|   |   schema.prisma
+|   |   
+|   \---migrations
+|       \---0001_init
+|               schema.sql
+|               
++---src
+|   |   app.ts
+|   |   server.ts
+|   |   
+|   +---ai
+|   |       providers.ts
+|   |       
+|   +---config
+|   |       env.ts
+|   |       
+|   +---controllers
+|   |       auth.controller.ts
+|   |       flashcard.controller.ts
+|   |       lesson.controller.ts
+|   |       planner.controller.ts
+|   |       quiz.controller.ts
+|   |       tutor.controller.ts
+|   |       
+|   +---db
+|   |       prisma.ts
+|   |       
+|   +---middlewares
+|   |       auth.middleware.ts
+|   |       error.middleware.ts
+|   |       
+|   +---routes
+|   |       auth.routes.ts
+|   |       bookmark.routes.ts
+|   |       challenge.routes.ts
+|   |       essay.routes.ts
+|   |       flashcard.routes.ts
+|   |       homework.routes.ts
+|   |       job.routes.ts
+|   |       lesson.routes.ts
+|   |       planner.routes.ts
+|   |       progress.routes.ts
+|   |       quiz.routes.ts
+|   |       search.routes.ts
+|   |       tutor.routes.ts
+|   |       voice.routes.ts
+|   |       
+|   +---schedulers
+|   |       daily.scheduler.ts
+|   |       index.ts
+|   |       
+|   +---services
+|   |       auth.service.ts
+|   |       flashcard.service.ts
+|   |       job.service.ts
+|   |       lesson.service.ts
+|   |       planner.service.ts
+|   |       quiz.service.ts
+|   |       tutor.service.ts
+|   |       
+|   +---utils
+|   |       jwt.ts
+|   |       rrule.ts
+|   |       sm2.ts
+|   |       validation.ts
+|   |       
+|   \---workers
+|           job.worker.ts
+|           
+\---tests
+        auth.test.ts
+        
