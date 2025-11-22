@@ -5,7 +5,7 @@ export async function submitHomework(userId: string, data: any) {
   const { imageUrl, question, subject } = data;
 
   // Queue homework help job
-  const jobId = await jobService.createJob({
+  const job = await jobService.createJob({
     type: 'homework_help',
     userId,
     payload: {
@@ -15,7 +15,7 @@ export async function submitHomework(userId: string, data: any) {
     },
   });
 
-  return { jobId, message: 'Homework help queued' };
+  return { jobId: job.id, message: 'Homework help queued' };
 }
 
 export async function getHomeworkHelp(jobId: string, userId: string) {

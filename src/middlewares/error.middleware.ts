@@ -21,8 +21,13 @@ export function errorHandler(
   next: NextFunction
 ): void {
   if (err instanceof ZodError) {
+    const firstError = err.errors[0];
+    const errorMessage = firstError 
+      ? `${firstError.path.join('.')}: ${firstError.message}`
+      : 'Validation error';
     res.status(400).json({
-      error: 'Validation error',
+      error: errorMessage,
+      message: errorMessage,
       details: err.errors,
     });
     return;

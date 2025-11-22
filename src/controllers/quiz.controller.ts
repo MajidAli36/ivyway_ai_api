@@ -18,6 +18,19 @@ export async function getQuizzes(req: AuthRequest, res: Response): Promise<void>
   res.json({ quizzes });
 }
 
+export async function getQuizById(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const { id } = req.params;
+
+  const quiz = await quizService.getQuizById(userId, id);
+  if (!quiz) {
+    res.status(404).json({ error: 'Quiz not found' });
+    return;
+  }
+
+  res.json({ quiz });
+}
+
 export async function submitAttempt(req: AuthRequest, res: Response): Promise<void> {
   const userId = req.user!.userId;
   const { quizId } = req.params;
@@ -25,5 +38,11 @@ export async function submitAttempt(req: AuthRequest, res: Response): Promise<vo
 
   const result = await quizService.submitQuizAttempt(userId, quizId, answers);
   res.json(result);
+}
+
+export async function generateQuiz(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const result = await quizService.generateQuiz(userId, req.body);
+  res.status(202).json(result);
 }
 

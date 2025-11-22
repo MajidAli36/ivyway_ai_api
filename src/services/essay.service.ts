@@ -1,12 +1,11 @@
 import { prisma } from '../db/prisma';
 import * as jobService from './job.service';
-import { env } from '../config/env';
 
 export async function analyzeEssay(userId: string, data: any) {
   const { content, essayType, topic } = data;
 
   // For now, queue the analysis job
-  const jobId = await jobService.createJob({
+  const job = await jobService.createJob({
     type: 'essay',
     userId,
     payload: {
@@ -16,7 +15,7 @@ export async function analyzeEssay(userId: string, data: any) {
     },
   });
 
-  return { jobId, message: 'Essay analysis queued' };
+  return { jobId: job.id, message: 'Essay analysis queued' };
 }
 
 export async function getEssayAnalysis(jobId: string, userId: string) {

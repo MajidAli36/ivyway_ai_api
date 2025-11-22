@@ -39,23 +39,28 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/stats', async (req: AuthRequest, res) => {
-  const userId = req.user!.userId;
+  try {
+    const userId = req.user!.userId;
 
-  const [conversations, lessons, quizzes, flashcards, tasks] = await Promise.all([
-    prisma.conversation.count({ where: { userId } }),
-    prisma.lesson.count({ where: { ownerId: userId } }),
-    prisma.quiz.count({ where: { ownerId: userId } }),
-    prisma.flashDeck.count({ where: { ownerId: userId } }),
-    prisma.studyTask.count({ where: { userId } }),
-  ]);
+    const [conversations, lessons, quizzes, flashcards, tasks] = await Promise.all([
+      prisma.conversation.count({ where: { userId } }),
+      prisma.lesson.count({ where: { ownerId: userId } }),
+      prisma.quiz.count({ where: { ownerId: userId } }),
+      prisma.flashDeck.count({ where: { ownerId: userId } }),
+      prisma.studyTask.count({ where: { userId } }),
+    ]);
 
-  res.json({
-    conversations,
-    lessons,
-    quizzes,
-    flashcards,
-    tasks,
-  });
+    res.json({
+      conversations,
+      lessons,
+      quizzes,
+      flashcards,
+      tasks,
+    });
+  } catch (error) {
+    console.error('Error fetching progress stats:', error);
+    res.status(500).json({ error: 'Failed to fetch progress statistics' });
+  }
 });
 
 export { router as progressRouter };

@@ -93,6 +93,34 @@ router.get('/', async (req, res, next) => {
 
 /**
  * @swagger
+ * /api/quizzes/{id}:
+ *   get:
+ *     summary: Get quiz by ID
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Quiz details
+ *       404:
+ *         description: Quiz not found
+ */
+router.get('/:id', async (req, res, next) => {
+  try {
+    await quizController.getQuizById(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
  * /api/quizzes/{quizId}/attempt:
  *   post:
  *     summary: Submit quiz attempt
@@ -130,6 +158,45 @@ router.get('/', async (req, res, next) => {
 router.post('/:quizId/attempt', async (req, res, next) => {
   try {
     await quizController.submitAttempt(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/quizzes/generate:
+ *   post:
+ *     summary: Generate a quiz from topic or image
+ *     tags: [Quizzes]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               topic:
+ *                 type: string
+ *                 example: "Photosynthesis"
+ *               imageUri:
+ *                 type: string
+ *                 example: "data:image/jpeg;base64,..."
+ *               language:
+ *                 type: string
+ *                 default: "en"
+ *               numQuestions:
+ *                 type: integer
+ *                 default: 10
+ *     responses:
+ *       202:
+ *         description: Quiz generation job created
+ */
+router.post('/generate', async (req, res, next) => {
+  try {
+    await quizController.generateQuiz(req as any, res);
   } catch (error) {
     next(error);
   }

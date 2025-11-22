@@ -6,13 +6,29 @@ import * as authService from '../services/auth.service';
 export async function register(req: AuthRequest, res: Response): Promise<void> {
   const data = req.body;
   const result = await authService.registerUser(data);
-  res.status(201).json(result);
+  
+  // Map fullName to name for frontend compatibility
+  res.status(201).json({
+    ...result,
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
 }
 
 export async function login(req: AuthRequest, res: Response): Promise<void> {
   const data = req.body;
   const result = await authService.loginUser(data);
-  res.json(result);
+  
+  // Map fullName to name for frontend compatibility
+  res.json({
+    ...result,
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
 }
 
 export async function getProfile(req: AuthRequest, res: Response): Promise<void> {
@@ -32,6 +48,57 @@ export async function getProfile(req: AuthRequest, res: Response): Promise<void>
     },
   });
 
-  res.json({ user });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  // Map fullName to name for frontend compatibility
+  res.json({ 
+    user: {
+      ...user,
+      name: user.fullName,
+    }
+  });
+}
+
+export async function updateProfile(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const data = req.body;
+  const result = await authService.updateUserProfile(userId, data);
+  
+  // Map fullName to name for frontend compatibility
+  res.json({
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
+}
+
+export async function refreshToken(req: AuthRequest, res: Response): Promise<void> {
+  const { refreshToken } = req.body;
+  
+  if (!refreshToken) {
+    res.status(400).json({ error: 'Refresh token is required' });
+    return;
+  }
+
+  const result = await authService.refreshUserTokens(refreshToken);
+  
+  res.json({
+    ...result,
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
+}
+
+export async function logout(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  await authService.logoutUser(userId);
+  
+  res.json({ message: 'Logged out successfully' });
 }
 

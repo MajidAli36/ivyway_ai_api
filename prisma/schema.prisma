@@ -27,6 +27,7 @@ model User {
   bio         String?
   profileImage String?
   language    String?
+  refreshToken String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

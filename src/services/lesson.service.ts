@@ -1,20 +1,23 @@
 import { prisma } from '../db/prisma';
 import * as jobService from './job.service';
-import { AppError } from '../middlewares/error.middleware';
-import { env } from '../config/env';
 
 export async function createLesson(userId: string, data: any) {
   const { title, content, language, isPublic } = data;
 
   // If content is empty, queue AI generation
   if (!content || content.trim() === '') {
-    const jobId = await jobService.createJob({
+    const job = await jobService.createJob({
       type: 'lesson_gen',
       userId,
-      payload: { title, language: language || 'en' },
+      payload: { 
+        topic: title, 
+        level: 'intermediate', // Default level, can be made configurable
+        language: language || 'en',
+        title, // Keep title for lesson creation
+      },
     });
 
-    return { lesson: null, jobId };
+    return { lesson: null, jobId: job.id };
   }
 
   const lesson = await prisma.lesson.create({
@@ -54,5 +57,16 @@ export async function searchLessons(query: string, limit = 20, offset = 0) {
     ORDER BY ts_rank(search, plainto_tsquery('simple', ${query})) DESC
     LIMIT ${limit} OFFSET ${offset}
   `;
+}
+
+export async function getLessonById(lessonId: string, userId: string) {
+  const lesson = await prisma.lesson.findFirst({
+    where: {
+      id: lessonId,
+      ownerId: userId, // Ensure user owns the lesson
+    },
+  });
+
+  return lesson;
 }
 

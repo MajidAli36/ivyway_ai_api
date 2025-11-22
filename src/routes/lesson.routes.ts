@@ -118,4 +118,32 @@ router.get('/search', async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/lessons/{id}:
+ *   get:
+ *     summary: Get a lesson by ID
+ *     tags: [Lessons]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lesson found
+ *       404:
+ *         description: Lesson not found
+ */
+router.get('/:id', async (req, res, next) => {
+  try {
+    await lessonController.getLessonById(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as lessonRouter };

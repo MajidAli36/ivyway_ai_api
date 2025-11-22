@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import * as authController from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
-import { registerSchema, loginSchema } from '../utils/validation';
+import { registerSchema, loginSchema, updateProfileSchema } from '../utils/validation';
+import { uploadImage } from '../utils/cloudinary';
 
 const router = Router();
 
@@ -103,5 +104,142 @@ router.post('/login', async (req, res, next) => {
  *         description: Unauthorized
  */
 router.get('/me', authenticate, authController.getProfile);
+
+/**
+ * @swagger
+ * /api/auth/me:
+ *   patch:
+ *     summary: Update current user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fullName:
+ *                 type: string
+ *                 example: John Doe
+ *               bio:
+ *                 type: string
+ *                 example: I love learning!
+ *               language:
+ *                 type: string
+ *                 example: en
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.patch('/me', authenticate, async (req, res, next) => {
+  try {
+    const data = updateProfileSchema.parse(req.body);
+    req.body = data;
+    await authController.updateProfile(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/upload-image:
+ *   post:
+ *     summary: Upload profile image to Cloudinary
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - image
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: base64
+ *                 description: Base64 encoded image
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *       400:
+ *         description: Invalid image data
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/upload-image', authenticate, async (req, res, next) => {
+  try {
+    const { image } = req.body;
+    
+    if (!image || typeof image !== 'string') {
+      res.status(400).json({ error: 'Image data is required' });
+      return;
+    }
+
+    const result = await uploadImage(image, 'ivyway/profiles');
+    
+    res.json({
+      url: result.secure_url,
+      publicId: result.public_id,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token using refresh token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: Refresh token
+ *     responses:
+ *       200:
+ *         description: Tokens refreshed successfully
+ *       401:
+ *         description: Invalid refresh token
+ */
+router.post('/refresh', async (req, res, next) => {
+  try {
+    await authController.refreshToken(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout user and invalidate refresh token
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/logout', authenticate, authController.logout);
 
 export { router as authRouter };

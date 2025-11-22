@@ -2,13 +2,20 @@ import { z } from 'zod';
 
 export const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(6),
   fullName: z.string().min(1),
 });
 
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string(),
+});
+
+export const updateProfileSchema = z.object({
+  fullName: z.string().min(1).optional(),
+  bio: z.string().optional().nullable(),
+  language: z.string().optional().nullable(),
+  profileImage: z.string().url().optional().nullable(),
 });
 
 export const tutorMessageSchema = z.object({

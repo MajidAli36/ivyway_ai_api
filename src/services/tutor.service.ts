@@ -101,7 +101,7 @@ export async function sendMessage(
     const provider = env.LLM_PROVIDER;
     const model = provider === 'openai' ? env.TUTOR_MODEL_OPENAI : env.TUTOR_MODEL_OLLAMA;
 
-    const jobId = await jobService.createJob({
+    const job = await jobService.createJob({
       type: 'ai_tutor',
       userId: data.userId,
       payload: {
@@ -116,7 +116,7 @@ export async function sendMessage(
     return {
       conversationId: data.conversationId,
       messageId: data.messageId,
-      jobId,
+      jobId: job.id,
     };
   });
 }

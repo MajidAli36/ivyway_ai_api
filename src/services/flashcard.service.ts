@@ -9,33 +9,77 @@ export async function createDeck(userId: string, data: any) {
       ownerId: userId,
       title,
     },
+    include: { cards: true },
   });
 
-  await prisma.flashCard.createMany({
-    data: cards.map((card: any) => ({
-      deckId: deck.id,
-      front: card.front,
-      back: card.back,
-      ease: 2.5,
-      interval: 1,
-      due: new Date(),
-    })),
-  });
+  if (cards && cards.length > 0) {
+    await prisma.flashCard.createMany({
+      data: cards.map((card: any) => ({
+        deckId: deck.id,
+        front: card.front,
+        back: card.back,
+        ease: 2.5,
+        interval: 1,
+        due: new Date(),
+      })),
+    });
 
-  return { deck };
+    // Reload deck with cards
+    const deckWithCards = await prisma.flashDeck.findUnique({
+      where: { id: deck.id },
+      include: { cards: true },
+    });
+
+    return formatDeckResponse(deckWithCards!);
+  }
+
+  return formatDeckResponse(deck);
+}
+
+function formatDeckResponse(deck: any) {
+  const totalCards = deck.cards?.length || 0;
+  const masteredCards = deck.cards?.filter((c: any) => c.ease >= 2.5).length || 0;
+  
+  return {
+    deck: {
+      id: deck.id,
+      title: deck.title,
+      description: `Study deck for ${deck.title}`,
+      subject: 'General',
+      grade: 8,
+      cards: (deck.cards || []).map((card: any) => ({
+        id: card.id,
+        front: card.front,
+        back: card.back,
+        difficulty: card.ease < 2.0 ? 'hard' : card.ease < 2.5 ? 'medium' : 'easy',
+        category: 'General',
+        tags: [],
+        createdAt: card.due?.toISOString() || new Date().toISOString(),
+        lastReviewed: card.due?.toISOString(),
+        reviewCount: 0,
+        masteryLevel: Math.min(5, Math.max(0, Math.round(card.ease * 2))),
+      })),
+      createdAt: deck.createdAt.toISOString(),
+      lastStudied: deck.cards?.[0]?.due?.toISOString(),
+      totalCards,
+      masteredCards,
+    },
+  };
 }
 
 export async function getDecks(userId: string, limit = 20, offset = 0) {
-  return prisma.flashDeck.findMany({
+  const decks = await prisma.flashDeck.findMany({
     where: { ownerId: userId },
     take: limit,
     skip: offset,
     orderBy: { createdAt: 'desc' },
     include: { cards: true },
   });
+
+  return decks.map(formatDeckResponse).map((d: any) => d.deck);
 }
 
-export async function getDueCards(userId: string, deckId: string, limit = 10) {
+export async function getDueCards(_userId: string, deckId: string, limit = 10) {
   return prisma.flashCard.findMany({
     where: {
       deckId,

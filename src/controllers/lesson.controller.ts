@@ -31,3 +31,17 @@ export async function searchLessons(req: AuthRequest, res: Response): Promise<vo
   }
 }
 
+export async function getLessonById(req: AuthRequest, res: Response): Promise<void> {
+  const userId = req.user!.userId;
+  const { id } = req.params;
+
+  const lesson = await lessonService.getLessonById(id, userId);
+  
+  if (!lesson) {
+    res.status(404).json({ error: 'Lesson not found' });
+    return;
+  }
+
+  res.json({ lesson });
+}
+
