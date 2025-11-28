@@ -242,4 +242,25 @@ router.post('/refresh', async (req, res, next) => {
  */
 router.post('/logout', authenticate, authController.logout);
 
+/**
+ * @swagger
+ * /api/auth/guest:
+ *   post:
+ *     summary: Login as guest user
+ *     tags: [Authentication]
+ *     description: Creates a temporary guest user account and returns authentication tokens
+ *     responses:
+ *       200:
+ *         description: Guest login successful
+ *       500:
+ *         description: Server error
+ */
+router.post('/guest', async (req, res, next) => {
+  try {
+    await authController.loginAsGuest(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as authRouter };

@@ -102,3 +102,16 @@ export async function logout(req: AuthRequest, res: Response): Promise<void> {
   res.json({ message: 'Logged out successfully' });
 }
 
+export async function loginAsGuest(_req: AuthRequest, res: Response): Promise<void> {
+  const result = await authService.loginAsGuest();
+  
+  // Map fullName to name for frontend compatibility
+  res.json({
+    ...result,
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
+}
+

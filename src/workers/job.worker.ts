@@ -8,6 +8,56 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Helper function to map AI question types to QType enum
+function mapQuestionType(type: string | undefined): 'MCQ' | 'TRUE_FALSE' | 'SHORT_ANSWER' {
+  if (!type) return 'MCQ';
+  
+  const normalized = type.toLowerCase().trim();
+  if (normalized.includes('true') || normalized.includes('false') || normalized === 'true_false') {
+    return 'TRUE_FALSE';
+  }
+  if (normalized.includes('short') || normalized.includes('text') || normalized === 'short_answer') {
+    return 'SHORT_ANSWER';
+  }
+  // Default to MCQ for multiple-choice, multiple choice, mcq, etc.
+  return 'MCQ';
+}
+
+// Helper function to sanitize raw response for JSON storage
+function sanitizeRawResponse(raw: any): any {
+  if (!raw) return null;
+  
+  try {
+    // Convert to JSON string and back to remove functions
+    const jsonString = JSON.stringify(raw, (_key, value) => {
+      // Skip functions
+      if (typeof value === 'function') {
+        return undefined;
+      }
+      // Handle special objects that might contain functions
+      if (value && typeof value === 'object') {
+        // Check if it's an object with function properties
+        const hasFunctions = Object.values(value).some(v => typeof v === 'function');
+        if (hasFunctions) {
+          // Return a simplified version
+          return Object.fromEntries(
+            Object.entries(value).filter(([_, v]) => typeof v !== 'function')
+          );
+        }
+      }
+      return value;
+    });
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.warn('Failed to sanitize raw response, storing minimal data:', error);
+    // Return minimal safe data
+    return {
+      error: 'Could not serialize full response',
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
 async function processTutorJob(job: Job) {
   const { conversationId, model, provider, language } = job.payload as JobPayload;
 
@@ -34,8 +84,12 @@ async function processTutorJob(job: Job) {
     content: `You are an AI tutor. Respond in ${language || 'English'}. Be helpful, clear, and engaging.`,
   });
 
-  const modelName = model || (provider === 'openai' ? env.TUTOR_MODEL_OPENAI : env.TUTOR_MODEL_OLLAMA);
-  const providerName = provider || env.LLM_PROVIDER || 'openai';
+  const modelName = model || (
+    provider === 'openai' ? env.TUTOR_MODEL_OPENAI :
+    provider === 'gemini' ? env.TUTOR_MODEL_GEMINI :
+    env.TUTOR_MODEL_OLLAMA
+  );
+  const providerName = provider || env.LLM_PROVIDER || 'gemini';
 
   // Call LLM
   const llmResponse = await callTutorLLM({ 
@@ -50,12 +104,12 @@ async function processTutorJob(job: Job) {
       conversationId,
       sender: 'assistant',
       content: llmResponse.text,
-      model: modelName,
+      model: llmResponse.model || modelName, // Use actual model from response
       provider: providerName,
       promptTokens: llmResponse.usage?.promptTokens,
       completionTokens: llmResponse.usage?.completionTokens,
       latencyMs: llmResponse.latencyMs,
-      raw: llmResponse.raw as any,
+      raw: sanitizeRawResponse(llmResponse.raw), // Sanitize to remove functions
     },
   });
 
@@ -70,8 +124,8 @@ async function processTutorJob(job: Job) {
 
 async function processLessonGenJob(job: Job) {
   const { topic, level, language, title } = job.payload as JobPayload;
-  const provider = env.LLM_PROVIDER || 'openai';
-  const model = env.LESSON_MODEL || 'gpt-4o-mini';
+  const provider = env.LLM_PROVIDER || 'gemini';
+  const model = env.LESSON_MODEL || 'gemini-pro';
 
   if (!topic) {
     throw new Error('topic is required');
@@ -109,8 +163,8 @@ async function processLessonGenJob(job: Job) {
 
 async function processQuizGenJob(job: Job) {
   const { topic, numQuestions = 10, language = 'en' } = job.payload as JobPayload;
-  const provider = env.LLM_PROVIDER || 'openai';
-  const model = env.QUIZ_MODEL || 'gpt-4o-mini';
+  const provider = env.LLM_PROVIDER || 'gemini';
+  const model = env.QUIZ_MODEL || 'gemini-pro';
 
   if (!topic) {
     throw new Error('Topic is required for quiz generation');
@@ -170,7 +224,7 @@ async function processQuizGenJob(job: Job) {
     const question = await prisma.question.create({
       data: {
         quizId: quiz.id,
-        type: (q.type || 'MCQ') as 'MCQ' | 'TRUE_FALSE' | 'SHORT_ANSWER',
+        type: mapQuestionType(q.type), // Use helper function to map types
         prompt: q.prompt || q.question || '',
         answer: q.answer || '',
         order: i + 1,
@@ -178,12 +232,44 @@ async function processQuizGenJob(job: Job) {
     });
 
     if (q.choices && Array.isArray(q.choices) && q.choices.length > 0) {
-      await prisma.choice.createMany({
-        data: q.choices.map((choice: any, idx: number) => ({
+      // Get the answer text for matching
+      const answerText = (q.answer || '').trim().toLowerCase();
+      
+      // Create choices and determine which one is correct
+      const choicesData = q.choices.map((choice: any, idx: number) => {
+        const choiceText = typeof choice === 'string' ? choice : (choice.text || choice.label || '');
+        const choiceTextLower = choiceText.trim().toLowerCase();
+        
+        // Determine if this choice is correct
+        let isCorrect = false;
+        
+        // First check if explicitly marked as correct
+        if (typeof choice === 'object') {
+          isCorrect = choice.isCorrect || choice.correct || false;
+        }
+        
+        // If answer field exists, match it with choice text
+        if (answerText && !isCorrect) {
+          // Check for exact match or significant overlap
+          isCorrect = choiceTextLower === answerText ||
+                     (choiceTextLower.length > 5 && answerText.length > 5 && 
+                      (choiceTextLower.includes(answerText) || answerText.includes(choiceTextLower)));
+        }
+        
+        // Fallback: if no answer field and no explicit marking, default to first choice
+        if (!answerText && !isCorrect && idx === 0) {
+          isCorrect = true;
+        }
+        
+        return {
           questionId: question.id,
-          text: typeof choice === 'string' ? choice : (choice.text || choice.label || ''),
-          isCorrect: typeof choice === 'object' ? (choice.isCorrect || choice.correct || idx === 0) : false,
-        })),
+          text: choiceText,
+          isCorrect,
+        };
+      });
+      
+      await prisma.choice.createMany({
+        data: choicesData,
       });
     }
   }
@@ -210,8 +296,10 @@ async function processEssayJob(job: Job) {
     },
   ];
 
-  const provider = env.LLM_PROVIDER || 'openai';
-  const model = provider === 'openai' ? (env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini') : (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
+  const provider = env.LLM_PROVIDER || 'gemini';
+  const model = provider === 'openai' ? (env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini') :
+                provider === 'gemini' ? (env.TUTOR_MODEL_GEMINI || 'gemini-pro') :
+                (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
   const response = await callTutorLLM({ model, provider, messages });
 
   return {
@@ -248,8 +336,10 @@ Format your response as valid JSON only, no markdown.`,
     },
   ];
 
-  const provider = env.LLM_PROVIDER || 'openai';
-  const model = provider === 'openai' ? (env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini') : (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
+  const provider = env.LLM_PROVIDER || 'gemini';
+  const model = provider === 'openai' ? (env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini') :
+                provider === 'gemini' ? (env.TUTOR_MODEL_GEMINI || 'gemini-pro') :
+                (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
   const response = await callTutorLLM({ model, provider, messages });
 
   // Parse JSON response from AI
@@ -416,14 +506,33 @@ async function processJob() {
 export async function startWorker() {
   console.log('🚀 Job worker started');
 
+  let consecutiveEmptyPolls = 0;
+  const MAX_EMPTY_POLLS = 4; // Max backoff at 4 consecutive empty polls
+  const BASE_DELAY = 2000; // 2 seconds base delay (more conservative)
+  const MAX_DELAY = 10000; // Max 10 seconds between polls when idle
+  const POST_JOB_DELAY = 100; // Small delay after processing a job
+
   while (true) {
     try {
       const processed = await processJob();
       if (!processed) {
-        await sleep(1000); // Wait 1s if no jobs
+        // Exponential backoff when no jobs found
+        consecutiveEmptyPolls++;
+        // More aggressive backoff: 2s -> 3s -> 5s -> 8s -> 10s (capped)
+        const delay = Math.min(
+          BASE_DELAY * Math.pow(1.5, Math.min(consecutiveEmptyPolls - 1, MAX_EMPTY_POLLS)),
+          MAX_DELAY
+        );
+        await sleep(Math.round(delay));
+      } else {
+        // Reset counter when job is processed
+        consecutiveEmptyPolls = 0;
+        // Small delay to prevent rapid-fire polling if jobs complete quickly
+        await sleep(POST_JOB_DELAY);
       }
     } catch (error) {
       console.error('Worker error:', error);
+      consecutiveEmptyPolls = 0; // Reset on error
       await sleep(5000); // Wait 5s on error
     }
   }

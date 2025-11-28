@@ -165,3 +165,47 @@ export async function logoutUser(userId: string) {
   });
 }
 
+export async function loginAsGuest() {
+  // Create a temporary guest user
+  // Use a unique email based on timestamp to avoid conflicts
+  const guestEmail = `guest-${Date.now()}@guest.local`;
+  const guestName = `Guest User ${Math.floor(Math.random() * 10000)}`;
+  
+  // Check if we should reuse an existing guest user or create new
+  // For now, we'll create a new guest user each time for better isolation
+  const hashedPassword = await bcrypt.hash('guest-password-' + Date.now(), 10);
+  
+  const user = await prisma.user.create({
+    data: {
+      email: guestEmail,
+      password: hashedPassword,
+      fullName: guestName,
+    },
+    select: {
+      id: true,
+      email: true,
+      fullName: true,
+      createdAt: true,
+    },
+  });
+
+  const accessToken = signAccessToken({ userId: user.id, email: user.email });
+  const refreshToken = signRefreshToken({ userId: user.id, email: user.email });
+
+  // Store refresh token in database
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshToken },
+  });
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+    },
+    accessToken,
+    refreshToken,
+  };
+}
+

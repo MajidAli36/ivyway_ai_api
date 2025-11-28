@@ -17,15 +17,17 @@ export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
 
   // AI Providers
-  LLM_PROVIDER: process.env.LLM_PROVIDER || 'openai',
+  LLM_PROVIDER: process.env.LLM_PROVIDER || 'gemini',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
 
   // Models
   TUTOR_MODEL_OPENAI: process.env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini',
+  TUTOR_MODEL_GEMINI: process.env.TUTOR_MODEL_GEMINI || 'gemini-pro',
   TUTOR_MODEL_OLLAMA: process.env.TUTOR_MODEL_OLLAMA || 'llama3:8b',
-  LESSON_MODEL: process.env.LESSON_MODEL || 'gpt-4',
-  QUIZ_MODEL: process.env.QUIZ_MODEL || 'gpt-4',
+  LESSON_MODEL: process.env.LESSON_MODEL || 'gemini-pro',
+  QUIZ_MODEL: process.env.QUIZ_MODEL || 'gemini-pro',
 
   // File Storage
   FILE_STORAGE: process.env.FILE_STORAGE || 'local',
