@@ -18,8 +18,13 @@ export interface JobPayload {
   imageUrl?: string;
   question?: string;
   subject?: string;
+  grade?: number;
   audioUrl?: string;
   numQuestions?: number;
+  thesis?: string;
+  draft?: string;
+  rubric?: string;
+  focusAreas?: string[];
   [key: string]: unknown;
 }
 

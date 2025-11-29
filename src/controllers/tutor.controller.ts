@@ -32,9 +32,16 @@ export async function getMessages(req: AuthRequest, res: Response): Promise<void
 export async function sendMessage(req: AuthRequest, res: Response): Promise<void> {
   const userId = req.user!.userId;
   const { conversationId } = req.params;
-  const { content, language } = req.body;
+  const { content, language, subject, grade } = req.body;
 
-  const result = await tutorService.sendMessage(userId, conversationId || null, content, language);
+  const result = await tutorService.sendMessage(
+    userId, 
+    conversationId || null, 
+    content, 
+    language,
+    subject,
+    grade
+  );
   res.status(201).json(result);
 }
 

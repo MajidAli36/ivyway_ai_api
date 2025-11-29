@@ -1,26 +1,52 @@
 import { prisma } from '../db/prisma';
 import * as jobService from './job.service';
 
-export async function analyzeEssay(userId: string, data: any) {
-  const { content, essayType, topic } = data;
+export async function generateOutline(userId: string, data: { thesis: string; subject?: string }) {
+  const { thesis, subject } = data;
 
-  // For now, queue the analysis job
+  if (!thesis || !thesis.trim()) {
+    throw new Error('Thesis statement is required');
+  }
+
   const job = await jobService.createJob({
-    type: 'essay',
+    type: 'essay_outline',
     userId,
     payload: {
-      content,
-      essayType,
-      topic,
+      thesis: thesis.trim(),
+      subject: subject || 'General',
     },
   });
 
-  return { jobId: job.id, message: 'Essay analysis queued' };
+  return { jobId: job.id, message: 'Essay outline generation queued' };
+}
+
+export async function gradeEssay(userId: string, data: { draft: string; rubric?: string; focusAreas?: string[] }) {
+  const { draft, rubric, focusAreas } = data;
+
+  if (!draft || !draft.trim()) {
+    throw new Error('Essay draft is required');
+  }
+
+  const job = await jobService.createJob({
+    type: 'essay_grade',
+    userId,
+    payload: {
+      draft: draft.trim(),
+      rubric,
+      focusAreas: focusAreas || [],
+    },
+  });
+
+  return { jobId: job.id, message: 'Essay grading queued' };
 }
 
 export async function getEssayAnalysis(jobId: string, userId: string) {
   const job = await prisma.job.findFirst({
-    where: { id: jobId, userId, type: 'essay' },
+    where: { 
+      id: jobId, 
+      userId, 
+      type: { in: ['essay', 'essay_outline', 'essay_grade'] }
+    },
   });
 
   if (!job) {

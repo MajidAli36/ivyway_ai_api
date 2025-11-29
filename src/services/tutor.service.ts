@@ -53,7 +53,9 @@ export async function sendMessage(
   userId: string,
   conversationId: string | null,
   content: string,
-  language: string = 'en'
+  language: string = 'en',
+  subject?: string,
+  grade?: number
 ): Promise<{ conversationId: string; messageId: string; jobId: string }> {
   // Sanitize input
   const sanitizedContent = sanitizeString(content);
@@ -110,6 +112,8 @@ export async function sendMessage(
         model,
         provider,
         language: data.language,
+        subject: subject || undefined,
+        grade: grade || undefined,
       },
     });
 

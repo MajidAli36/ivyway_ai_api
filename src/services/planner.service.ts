@@ -52,9 +52,21 @@ export async function updateTaskStatus(taskId: string, status: string) {
     }
   }
 
-  return prisma.studyTask.update({
+  const updatedTask = await prisma.studyTask.update({
     where: { id: taskId },
     data: { status },
   });
+
+  // Track progress if task is completed
+  if (status === 'completed' && task.status !== 'completed') {
+    // Only track if it wasn't already completed
+    import('../services/progress.service').then((progressService) => {
+      progressService.trackTaskCompletion(task.userId).catch((err) => {
+        console.error('Error tracking task completion:', err);
+      });
+    });
+  }
+
+  return updatedTask;
 }
 

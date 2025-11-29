@@ -34,11 +34,13 @@ model User {
   conversations      Conversation[]
   ownedLessons       Lesson[]
   ownedQuizzes       Quiz[]
-  ownedFlashDecks    FlashDeck[]
   ownedStudyTasks    StudyTask[]
   bookmarks          Bookmark[]
   quizAttempts       QuizAttempt[]
   jobs               Job[]
+  lessonCompletions  LessonCompletion[]
+  dailyActivities    DailyActivity[]
+  progress           UserProgress?
 }
 
 model Conversation {
@@ -85,6 +87,7 @@ model Lesson {
   createdAt DateTime @default(now())
 
   owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  completions LessonCompletion[]
 }
 
 model Quiz {
@@ -149,30 +152,6 @@ model AttemptAnswer {
   question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
 }
 
-model FlashDeck {
-  id        String   @id @default(cuid())
-  ownerId   String
-  title     String
-  createdAt DateTime @default(now())
-
-  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  cards     FlashCard[]
-}
-
-model FlashCard {
-  id        String   @id @default(cuid())
-  deckId    String
-  front     String
-  back      String
-  ease      Float    @default(2.5)
-  interval  Int      @default(1)
-  due       DateTime @default(now())
-
-  deck      FlashDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
-
-  @@index([deckId, due])
-}
-
 model StudyTask {
   id        String   @id @default(cuid())
   userId    String
@@ -218,5 +197,57 @@ model Job {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, runAt])
+}
+
+model LessonCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  completedAt DateTime @default(now())
+  timeSpent   Int?     // in seconds
+  progress    Int      @default(100) // 0-100%
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+  @@index([lessonId])
+}
+
+model DailyActivity {
+  id                String   @id @default(cuid())
+  userId            String
+  activityDate      DateTime @db.Date
+  lessonsCompleted  Int      @default(0)
+  quizzesCompleted  Int      @default(0)
+  tasksCompleted    Int      @default(0)
+  timeSpent         Int      @default(0) // in minutes
+  xpEarned          Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, activityDate])
+  @@index([userId, activityDate])
+}
+
+model UserProgress {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  totalLessonsCompleted Int      @default(0)
+  totalQuizzesCompleted  Int      @default(0)
+  totalTasksCompleted    Int      @default(0)
+  currentStreak          Int      @default(0)
+  longestStreak          Int      @default(0)
+  totalTimeSpent         Int      @default(0) // in minutes
+  totalXP                Int      @default(0)
+  level                  Int      @default(1)
+  lastActivityAt         DateTime?
+  updatedAt              DateTime @updatedAt
+
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 

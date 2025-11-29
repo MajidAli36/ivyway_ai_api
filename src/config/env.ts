@@ -6,9 +6,9 @@ export const env = {
   // Database
   DATABASE_URL: process.env.DATABASE_URL || 'postgresql://ivy:ivy@localhost:5432/ivyway?schema=public',
 
-  // JWT
-  JWT_SECRET: process.env.JWT_SECRET || 'supersecret',
-  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
+  // JWT - Secrets must be set in .env file (no fallbacks)
+  JWT_SECRET: process.env.JWT_SECRET,
+  JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   JWT_EXPIRE: process.env.JWT_EXPIRE || '15m',
   JWT_REFRESH_EXPIRE: process.env.JWT_REFRESH_EXPIRE || '7d',
 
@@ -16,10 +16,10 @@ export const env = {
   PORT: parseInt(process.env.PORT || '5001'),
   NODE_ENV: process.env.NODE_ENV || 'development',
 
-  // AI Providers
+  // AI Providers - API keys must be set in .env file
   LLM_PROVIDER: process.env.LLM_PROVIDER || 'gemini',
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
 
   // Models
@@ -34,10 +34,10 @@ export const env = {
   UPLOAD_DIR: process.env.UPLOAD_DIR || './uploads',
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || '10485760'),
 
-  // Cloudinary
-  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
-  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
-  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
+  // Cloudinary (optional - only required if using Cloudinary)
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || undefined,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || undefined,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || undefined,
 
   // Rate Limiting
   RATE_LIMIT_WINDOW: parseInt(process.env.RATE_LIMIT_WINDOW || '15'),

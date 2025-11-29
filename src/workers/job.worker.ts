@@ -59,7 +59,7 @@ function sanitizeRawResponse(raw: any): any {
 }
 
 async function processTutorJob(job: Job) {
-  const { conversationId, model, provider, language } = job.payload as JobPayload;
+  const { conversationId, model, provider, language, subject, grade } = job.payload as JobPayload;
 
   if (!conversationId) {
     throw new Error('conversationId is required');
@@ -78,10 +78,51 @@ async function processTutorJob(job: Job) {
     content: msg.content,
   }));
 
-  // Add system message for language
+  // Build subject-specific system prompt with strong enforcement
+  let subjectContext = '';
+  if (subject) {
+    const subjectName = subject.trim();
+    subjectContext = `CRITICAL SUBJECT RESTRICTION: The student has selected "${subjectName}" as their subject. 
+
+You MUST:
+- ONLY provide answers, explanations, examples, and follow-up questions related to ${subjectName}
+- Stay strictly within the ${subjectName} domain
+- NOT include content from Mathematics, Science, Physics, Chemistry, Biology, English, History, Geography, Computer Science, or Art unless it directly and explicitly relates to ${subjectName}
+- Focus exclusively on ${subjectName} concepts, topics, and examples
+
+You MUST NOT:
+- Mix subjects or provide examples from other subjects
+- Include math examples when the subject is Science
+- Include science examples when the subject is Mathematics
+- Provide content from unrelated subjects
+
+If the student's question seems to relate to multiple subjects, interpret it ONLY in the context of ${subjectName}.`;
+  }
+
+  const gradeContext = grade 
+    ? `The student is in grade ${grade}. Adjust your explanations to be age-appropriate and suitable for a grade ${grade} level. Use vocabulary and concepts appropriate for this grade level.`
+    : '';
+
+  // Enhanced system message that requests structured response with subject enforcement
+  const systemPrompt = `You are an AI tutor. Respond in ${language || 'English'}. Be helpful, clear, and engaging.
+
+${subjectContext}
+
+${gradeContext}
+
+When responding, provide a comprehensive answer. If possible, structure your response to include:
+- A clear and detailed explanation${subject ? ` (ONLY related to ${subject})` : ''}
+- Your confidence level in the answer (as a number between 0 and 1)
+- Relevant sources or topics if applicable${subject ? ` (ONLY from ${subject})` : ''}
+- Follow-up questions that would help the student learn more${subject ? ` (ONLY about ${subject})` : ''}
+
+${subject ? `CRITICAL: All examples, explanations, follow-up questions, and content MUST be exclusively about ${subject}. Do not mix subjects or provide examples from other subjects.` : ''}
+
+Format your response naturally in conversational style. The student will see your full response, so make it educational and engaging.`;
+
   llmMessages.unshift({
     role: 'system',
-    content: `You are an AI tutor. Respond in ${language || 'English'}. Be helpful, clear, and engaging.`,
+    content: systemPrompt,
   });
 
   const modelName = model || (
@@ -98,12 +139,83 @@ async function processTutorJob(job: Job) {
     messages: llmMessages 
   });
 
+  // Parse the AI response to extract structured information
+  const responseText = llmResponse.text.trim();
+  
+  // Try to extract structured data from the response
+  // Look for JSON-like structures or parse natural language
+  let parsedResponse: {
+    reply: string;
+    confidence?: number;
+    sources?: string[];
+    followUpQuestions?: string[];
+  } = {
+    reply: responseText,
+  };
+
+  // Try to parse JSON if the response contains structured data
+  try {
+    // Check if response contains JSON
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const jsonData = JSON.parse(jsonMatch[0]);
+      if (jsonData.reply || jsonData.answer || jsonData.content) {
+        parsedResponse.reply = jsonData.reply || jsonData.answer || jsonData.content || responseText;
+        parsedResponse.confidence = jsonData.confidence;
+        parsedResponse.sources = jsonData.sources;
+        parsedResponse.followUpQuestions = jsonData.followUpQuestions || jsonData.followUp;
+      }
+    }
+  } catch (error) {
+    // If JSON parsing fails, use the full response as reply
+    // We'll calculate confidence based on response quality
+  }
+
+  // Calculate confidence based on response characteristics if not provided
+  if (parsedResponse.confidence === undefined) {
+    // Base confidence on response length and quality indicators
+    const hasExplanation = responseText.length > 100;
+    const hasStructure = responseText.includes('\n') || responseText.includes('.');
+    const hasDetails = responseText.split('.').length > 2;
+    
+    // Calculate confidence: 0.7-0.95 based on quality indicators
+    let calculatedConfidence = 0.7;
+    if (hasExplanation) calculatedConfidence += 0.1;
+    if (hasStructure) calculatedConfidence += 0.05;
+    if (hasDetails) calculatedConfidence += 0.1;
+    parsedResponse.confidence = Math.min(calculatedConfidence, 0.95);
+  }
+
+  // Extract follow-up questions if not provided
+  if (!parsedResponse.followUpQuestions || parsedResponse.followUpQuestions.length === 0) {
+    // Look for question patterns in the response
+    const questionPattern = /(?:Would you like to|Do you|Can you|Have you|What|How|Why|When|Where).*?\?/gi;
+    const questions = responseText.match(questionPattern);
+    if (questions && questions.length > 0) {
+      parsedResponse.followUpQuestions = questions.slice(0, 3).map(q => q.trim());
+    }
+  }
+
+  // Extract sources if mentioned but not structured
+  if (!parsedResponse.sources || parsedResponse.sources.length === 0) {
+    // Look for source mentions (topics, subjects, concepts)
+    const sourcePattern = /(?:from|based on|according to|source:|topic:)\s+([^\.\n]+)/gi;
+    const sources = [];
+    let match;
+    while ((match = sourcePattern.exec(responseText)) !== null && sources.length < 3) {
+      sources.push(match[1].trim());
+    }
+    if (sources.length > 0) {
+      parsedResponse.sources = sources;
+    }
+  }
+
   // Save assistant message
   await prisma.message.create({
     data: {
       conversationId,
       sender: 'assistant',
-      content: llmResponse.text,
+      content: parsedResponse.reply,
       model: llmResponse.model || modelName, // Use actual model from response
       provider: providerName,
       promptTokens: llmResponse.usage?.promptTokens,
@@ -119,7 +231,14 @@ async function processTutorJob(job: Job) {
     data: { updatedAt: new Date() },
   });
 
-  return { success: true };
+  // Return structured response for the client
+  return {
+    reply: parsedResponse.reply,
+    content: parsedResponse.reply, // Also include for backward compatibility
+    confidence: parsedResponse.confidence,
+    sources: parsedResponse.sources || [],
+    followUpQuestions: parsedResponse.followUpQuestions || [],
+  };
 }
 
 async function processLessonGenJob(job: Job) {
@@ -274,25 +393,85 @@ async function processQuizGenJob(job: Job) {
     }
   }
 
-  return { quiz: { id: quiz.id, title: quiz.title } };
+  // Return quiz info along with raw AI response for storage in Job.result
+  return { 
+    quiz: { id: quiz.id, title: quiz.title },
+    rawAiResponse: questionsText, // Save the raw AI model response
+    parsedQuestions: questions.length // Include count of parsed questions
+  };
 }
 
 async function processEssayJob(job: Job) {
-  const { content, essayType, topic } = job.payload as JobPayload;
+  // Legacy support - redirect to outline or grade based on payload
+  const { content, topic } = job.payload as JobPayload;
   
-  if (!content || !essayType || !topic) {
-    throw new Error('content, essayType, and topic are required');
+  if (!content || typeof content !== 'string') {
+    throw new Error('content is required');
   }
 
-  // Call LLM for essay analysis
+  // If it looks like a thesis (short), treat as outline, otherwise as grade
+  if (content.length < 500) {
+    return await processEssayOutlineJob({
+      ...job,
+      payload: { ...job.payload, thesis: content, subject: topic || 'General' }
+    } as Job);
+  } else {
+    return await processEssayGradeJob({
+      ...job,
+      payload: { ...job.payload, draft: content }
+    } as Job);
+  }
+}
+
+async function processEssayOutlineJob(job: Job) {
+  const { thesis, subject } = job.payload as JobPayload;
+  
+  const thesisText = typeof thesis === 'string' ? thesis : '';
+  if (!thesisText || !thesisText.trim()) {
+    throw new Error('Thesis statement is required');
+  }
+
+  const subjectName = (typeof subject === 'string' ? subject : 'General') || 'General';
+
+  // Enhanced prompt for structured outline generation
+  const systemPrompt = `You are an expert essay writing tutor. Generate a comprehensive, structured essay outline based on a thesis statement.
+
+You MUST respond with ONLY valid JSON in this exact format:
+{
+  "thesis": "the thesis statement",
+  "outline": {
+    "introduction": {
+      "hook": "engaging opening sentence",
+      "background": "context and background information",
+      "thesis": "the thesis statement restated"
+    },
+    "body": [
+      {
+        "paragraphNumber": 1,
+        "topic": "main topic of paragraph",
+        "mainPoint": "the main argument/point",
+        "supportingEvidence": ["evidence point 1", "evidence point 2", "evidence point 3"],
+        "transition": "transition sentence to next paragraph"
+      }
+    ],
+    "conclusion": {
+      "restateThesis": "thesis restated in different words",
+      "summary": "summary of main points",
+      "callToAction": "final thought or call to action"
+    }
+  }
+}
+
+Generate 3-5 body paragraphs. Make the outline comprehensive, educational, and well-structured.`;
+
   const messages: LLMMessage[] = [
     {
       role: 'system',
-      content: `You are an expert essay analyzer. Analyze the essay for ${essayType} writing on ${topic}.`,
+      content: systemPrompt,
     },
     {
       role: 'user',
-      content: `Analyze this essay: ${content}`,
+      content: `Generate a comprehensive essay outline for this thesis statement in the subject of ${subjectName}:\n\n"${thesisText}"\n\nRespond with ONLY the JSON object, no markdown, no explanations.`,
     },
   ];
 
@@ -302,37 +481,226 @@ async function processEssayJob(job: Job) {
                 (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
   const response = await callTutorLLM({ model, provider, messages });
 
+  // Parse JSON response
+  let parsedResult: any;
+  try {
+    let jsonText = response.text.trim();
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '').trim();
+    }
+    
+    parsedResult = JSON.parse(jsonText);
+  } catch (error) {
+    console.error('Failed to parse essay outline JSON:', error);
+    console.error('Raw response:', response.text);
+    throw new Error('AI returned invalid JSON format. Please try again.');
+  }
+
+  // Validate and structure the response
+  if (!parsedResult.outline || !parsedResult.outline.introduction || !parsedResult.outline.body) {
+    throw new Error('AI response missing required outline structure');
+  }
+
+  const wordCountEstimate = thesisText.split(/\s+/).length * 50; // Rough estimate
+  
   return {
-    feedback: response.text,
-    suggestions: 'Review grammar, structure, and arguments',
+    thesis: parsedResult.thesis || thesisText,
+    outline: {
+      introduction: {
+        hook: parsedResult.outline.introduction.hook || '',
+        background: parsedResult.outline.introduction.background || '',
+        thesis: parsedResult.outline.introduction.thesis || parsedResult.thesis || thesisText,
+      },
+      body: Array.isArray(parsedResult.outline.body) ? parsedResult.outline.body.map((para: any, index: number) => ({
+        paragraphNumber: para.paragraphNumber || index + 1,
+        topic: para.topic || `Body Paragraph ${index + 1}`,
+        mainPoint: para.mainPoint || '',
+        supportingEvidence: Array.isArray(para.supportingEvidence) ? para.supportingEvidence : [],
+        transition: para.transition || '',
+      })) : [],
+      conclusion: {
+        restateThesis: parsedResult.outline.conclusion?.restateThesis || '',
+        summary: parsedResult.outline.conclusion?.summary || '',
+        callToAction: parsedResult.outline.conclusion?.callToAction || '',
+      },
+    },
+    wordCount: wordCountEstimate,
+    estimatedTime: Math.ceil(wordCountEstimate / 15), // 15 words per minute
+    difficulty: 'medium' as const,
+  };
+}
+
+async function processEssayGradeJob(job: Job) {
+  const { draft, focusAreas } = job.payload as JobPayload;
+  
+  const draftText = typeof draft === 'string' ? draft : '';
+  if (!draftText || !draftText.trim()) {
+    throw new Error('Essay draft is required');
+  }
+
+  const focusAreasList = Array.isArray(focusAreas) ? focusAreas : [];
+  const focusText = focusAreasList.length > 0 
+    ? ` Pay special attention to: ${focusAreasList.join(', ')}.`
+    : '';
+
+  // Enhanced prompt for structured grading
+  const systemPrompt = `You are an expert essay grader and writing tutor. Provide comprehensive, detailed feedback on an essay draft.
+
+You MUST respond with ONLY valid JSON in this exact format:
+{
+  "score": 85,
+  "overallFeedback": "comprehensive feedback on the essay",
+  "rubric": {
+    "content": {
+      "score": 18,
+      "maxScore": 20,
+      "feedback": "feedback on content quality"
+    },
+    "organization": {
+      "score": 13,
+      "maxScore": 15,
+      "feedback": "feedback on structure and organization"
+    },
+    "style": {
+      "score": 12,
+      "maxScore": 15,
+      "feedback": "feedback on writing style"
+    },
+    "grammar": {
+      "score": 17,
+      "maxScore": 20,
+      "feedback": "feedback on grammar and mechanics"
+    }
+  },
+  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"],
+  "strengths": ["strength 1", "strength 2"],
+  "areasForImprovement": ["area 1", "area 2"]
+}
+
+Score the essay on a scale of 0-100. Be fair, constructive, and educational. Provide specific, actionable feedback.${focusText}`;
+
+  const messages: LLMMessage[] = [
+    {
+      role: 'system',
+      content: systemPrompt,
+    },
+    {
+      role: 'user',
+      content: `Grade and provide detailed feedback on this essay draft:\n\n"${draftText}"\n\nRespond with ONLY the JSON object, no markdown, no explanations.`,
+    },
+  ];
+
+  const provider = env.LLM_PROVIDER || 'gemini';
+  const model = provider === 'openai' ? (env.TUTOR_MODEL_OPENAI || 'gpt-4o-mini') :
+                provider === 'gemini' ? (env.TUTOR_MODEL_GEMINI || 'gemini-pro') :
+                (env.TUTOR_MODEL_OLLAMA || 'llama3:8b');
+  const response = await callTutorLLM({ model, provider, messages });
+
+  // Parse JSON response
+  let parsedResult: any;
+  try {
+    let jsonText = response.text.trim();
+    // Remove markdown code blocks if present
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '').trim();
+    }
+    
+    parsedResult = JSON.parse(jsonText);
+  } catch (error) {
+    console.error('Failed to parse essay grade JSON:', error);
+    console.error('Raw response:', response.text);
+    throw new Error('AI returned invalid JSON format. Please try again.');
+  }
+
+  // Validate and structure the response
+  const score = typeof parsedResult.score === 'number' ? Math.max(0, Math.min(100, parsedResult.score)) : 75;
+  
+  return {
+    score,
+    overallFeedback: parsedResult.overallFeedback || parsedResult.feedback || 'Essay reviewed successfully.',
+    rubric: {
+      content: {
+        score: parsedResult.rubric?.content?.score || Math.round(score * 0.2),
+        maxScore: parsedResult.rubric?.content?.maxScore || 20,
+        feedback: parsedResult.rubric?.content?.feedback || 'Content evaluation provided.',
+      },
+      organization: {
+        score: parsedResult.rubric?.organization?.score || Math.round(score * 0.15),
+        maxScore: parsedResult.rubric?.organization?.maxScore || 15,
+        feedback: parsedResult.rubric?.organization?.feedback || 'Organization evaluation provided.',
+      },
+      style: {
+        score: parsedResult.rubric?.style?.score || Math.round(score * 0.15),
+        maxScore: parsedResult.rubric?.style?.maxScore || 15,
+        feedback: parsedResult.rubric?.style?.feedback || 'Style evaluation provided.',
+      },
+      grammar: {
+        score: parsedResult.rubric?.grammar?.score || Math.round(score * 0.2),
+        maxScore: parsedResult.rubric?.grammar?.maxScore || 20,
+        feedback: parsedResult.rubric?.grammar?.feedback || 'Grammar evaluation provided.',
+      },
+    },
+    suggestions: Array.isArray(parsedResult.suggestions) ? parsedResult.suggestions : 
+                 (parsedResult.suggestions ? [parsedResult.suggestions] : []),
+    strengths: Array.isArray(parsedResult.strengths) ? parsedResult.strengths : [],
+    areasForImprovement: Array.isArray(parsedResult.areasForImprovement) ? parsedResult.areasForImprovement : [],
   };
 }
 
 async function processHomeworkJob(job: Job) {
   const { imageUrl, question, subject } = job.payload as JobPayload;
   
-  const subjectName = (subject as string) || 'mathematics';
-  const problemText = (question as string) || (imageUrl ? 'Problem from image' : 'Homework problem');
+  const subjectName = (typeof subject === 'string' ? subject : 'mathematics') || 'mathematics';
+  const problemText = (typeof question === 'string' ? question : '') || (imageUrl ? 'Problem from image' : 'Homework problem');
+
+  if (!problemText || problemText.trim().length === 0) {
+    throw new Error('Problem question is required');
+  }
+
+  // Enhanced system prompt for structured, educational solutions
+  const systemPrompt = `You are an expert ${subjectName} tutor and educator. Your goal is to help students understand problems by providing clear, step-by-step solutions.
+
+You MUST respond with ONLY valid JSON in this exact format:
+{
+  "finalAnswer": "the final answer clearly stated",
+  "method": "the method or approach used to solve the problem",
+  "difficulty": "easy" | "medium" | "hard",
+  "steps": [
+    {
+      "stepNumber": 1,
+      "description": "what we do in this step",
+      "working": "mathematical work/calculations (if applicable)",
+      "explanation": "why we do this step and what it means"
+    }
+  ],
+  "estimatedTime": number (in minutes)
+}
+
+CRITICAL REQUIREMENTS:
+- Provide 3-8 detailed steps that break down the solution
+- Each step should be educational and help the student understand the process
+- Include working/calculations for mathematical problems
+- Explain WHY each step is taken, not just WHAT to do
+- Make the solution clear enough for a student to follow and learn from
+- The finalAnswer should be clearly stated with units if applicable
+- Difficulty should reflect the complexity: easy (basic), medium (requires some thinking), hard (complex/multi-step)
+- estimatedTime should be realistic for solving this problem
+
+Format your response as valid JSON only, no markdown code blocks, no explanations outside the JSON.`;
 
   const messages: LLMMessage[] = [
     {
       role: 'system',
-      content: `You are an expert ${subjectName} tutor. Provide step-by-step solutions to homework problems. Always respond with a JSON object containing:
-- finalAnswer: The final answer to the problem
-- method: The method used to solve it
-- difficulty: "easy", "medium", or "hard"
-- steps: An array of step objects, each with:
-  - stepNumber: number
-  - description: string
-  - working: string (optional, for equations/calculations)
-  - explanation: string
-- estimatedTime: number (in minutes)
-
-Format your response as valid JSON only, no markdown.`,
+      content: systemPrompt,
     },
     {
       role: 'user',
-      content: `Solve this ${subjectName} problem: ${problemText}${imageUrl ? `\n\nImage URL: ${imageUrl}` : ''}`,
+      content: `Solve this ${subjectName} problem step-by-step:\n\n"${problemText.trim()}"${imageUrl ? `\n\nNote: There is an image associated with this problem.` : ''}\n\nProvide a comprehensive, educational solution that helps the student understand the process. Respond with ONLY the JSON object.`,
     },
   ];
 
@@ -343,7 +711,7 @@ Format your response as valid JSON only, no markdown.`,
   const response = await callTutorLLM({ model, provider, messages });
 
   // Parse JSON response from AI
-  let result: {
+  let parsedResult: {
     finalAnswer?: string;
     answer?: string;
     method?: string;
@@ -358,47 +726,69 @@ Format your response as valid JSON only, no markdown.`,
   };
 
   try {
-    // Try to extract JSON from the response (AI might wrap it in markdown code blocks)
+    // Extract JSON from response (handle markdown code blocks)
     let jsonText = response.text.trim();
+    
+    // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      jsonText = jsonText.replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '').trim();
     } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '').trim();
+      jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```\s*$/, '').trim();
     }
     
-    result = JSON.parse(jsonText);
+    // Try to find JSON object if wrapped in text
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      jsonText = jsonMatch[0];
+    }
+    
+    parsedResult = JSON.parse(jsonText);
   } catch (error) {
     console.error('Failed to parse homework solution JSON:', error);
     console.error('Raw response:', response.text);
-    // Fallback: create a simple structure from the text response
-    result = {
-      finalAnswer: 'See explanation below',
-      method: 'Problem solving',
-      difficulty: 'medium',
-      estimatedTime: 10,
-      steps: [
-        {
-          stepNumber: 1,
-          description: 'Problem analysis',
-          explanation: response.text,
-        },
-      ],
-    };
+    throw new Error('AI returned invalid JSON format. Please try again with a clearer problem description.');
   }
 
+  // Validate and structure the response
+  if (!parsedResult.finalAnswer && !parsedResult.answer) {
+    throw new Error('AI response missing final answer');
+  }
+
+  // Ensure steps array exists and is valid
+  let steps = Array.isArray(parsedResult.steps) ? parsedResult.steps : [];
+  
+  // If no steps provided, create a fallback step from the response
+  if (steps.length === 0) {
+    steps = [{
+      stepNumber: 1,
+      description: 'Solution provided',
+      explanation: response.text.substring(0, 500), // Use first 500 chars of response
+    }];
+  }
+
+  // Normalize step numbers and ensure all required fields
+  steps = steps.map((step, index) => ({
+    stepNumber: step.stepNumber || index + 1,
+    description: step.description || `Step ${index + 1}`,
+    working: step.working || undefined,
+    explanation: step.explanation || step.description || 'See working above',
+  }));
+
+  // Validate difficulty
+  const difficulty = ['easy', 'medium', 'hard'].includes(parsedResult.difficulty || '')
+    ? (parsedResult.difficulty as 'easy' | 'medium' | 'hard')
+    : 'medium';
+
+  // Calculate estimated time if not provided
+  const estimatedTime = parsedResult.estimatedTime || Math.max(5, Math.ceil(steps.length * 2));
+
   return {
-    finalAnswer: result.finalAnswer || result.answer || 'Solution provided',
-    method: result.method || 'Problem solving',
-    difficulty: result.difficulty || 'medium',
-    steps: result.steps || [
-      {
-        stepNumber: 1,
-        description: 'Solution',
-        explanation: response.text,
-      },
-    ],
-    estimatedTime: result.estimatedTime || 10,
-    confidence: 0.8,
+    finalAnswer: parsedResult.finalAnswer || parsedResult.answer || 'Solution provided',
+    method: parsedResult.method || 'Problem solving',
+    difficulty,
+    steps,
+    estimatedTime,
+    confidence: steps.length >= 3 ? 0.9 : 0.7, // Higher confidence with more detailed steps
   };
 }
 
@@ -460,6 +850,12 @@ async function processJob() {
         break;
       case 'essay':
         result = await processEssayJob(job);
+        break;
+      case 'essay_outline':
+        result = await processEssayOutlineJob(job);
+        break;
+      case 'essay_grade':
+        result = await processEssayGradeJob(job);
         break;
       case 'homework_help':
         result = await processHomeworkJob(job);

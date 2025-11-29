@@ -268,6 +268,13 @@ export async function submitQuizAttempt(userId: string, quizId: string, answers:
     wrongCount: totalQuestions - correctCount,
   });
 
+  // Track progress (async, don't wait for it)
+  import('../services/progress.service').then((progressService) => {
+    progressService.trackQuizCompletion(userId, score, totalPoints).catch((err) => {
+      console.error('Error tracking quiz completion:', err);
+    });
+  });
+
   return { 
     attempt, 
     score, 

@@ -93,26 +93,6 @@ const options: swaggerJsdoc.Options = {
             createdAt: { type: 'string', format: 'date-time' },
           },
         },
-        FlashDeck: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', example: 'cuid' },
-            title: { type: 'string', example: 'Spanish Vocabulary' },
-            createdAt: { type: 'string', format: 'date-time' },
-            cards: { type: 'array', items: { type: 'object' } },
-          },
-        },
-        FlashCard: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', example: 'cuid' },
-            front: { type: 'string', example: 'Hello' },
-            back: { type: 'string', example: 'Hola' },
-            ease: { type: 'number', example: 2.5 },
-            interval: { type: 'integer', example: 1 },
-            due: { type: 'string', format: 'date-time' },
-          },
-        },
         StudyTask: {
           type: 'object',
           properties: {

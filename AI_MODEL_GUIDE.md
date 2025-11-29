@@ -4,7 +4,7 @@
 
 Your Google AI Studio API key is already configured in the `env` file:
 ```
-GEMINI_API_KEY=AIzaSyA9woUOIf8jQs70cJYyVcCjxq-1O5Q4AP4
+GEMINI_API_KEY=yourgeminikey here
 ```
 
 ## 🎯 How Model Selection Works

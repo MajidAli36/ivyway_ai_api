@@ -4,11 +4,13 @@ import * as essayController from '../controllers/essay.controller';
 
 const router = Router();
 
+router.use(authenticate);
+
 /**
  * @swagger
- * /api/essays/analyze:
+ * /api/essays/outline:
  *   post:
- *     summary: Analyze an essay
+ *     summary: Generate essay outline from thesis
  *     tags: [Essays]
  *     security:
  *       - bearerAuth: []
@@ -18,23 +20,53 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - thesis
  *             properties:
- *               content:
+ *               thesis:
  *                 type: string
- *                 example: "Essay content here..."
- *               essayType:
+ *                 example: "Social media has both positive and negative effects on teenagers"
+ *               subject:
  *                 type: string
- *                 example: "academic"
- *               topic:
- *                 type: string
- *                 example: "Climate Change"
+ *                 example: "English"
  *     responses:
  *       202:
- *         description: Essay analysis queued
+ *         description: Essay outline generation queued
  */
-router.use(authenticate);
+router.post('/outline', essayController.generateOutline);
 
-router.post('/analyze', essayController.analyzeEssay);
+/**
+ * @swagger
+ * /api/essays/grade:
+ *   post:
+ *     summary: Grade an essay draft
+ *     tags: [Essays]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - draft
+ *             properties:
+ *               draft:
+ *                 type: string
+ *                 example: "Essay content here..."
+ *               rubric:
+ *                 type: string
+ *                 example: "academic"
+ *               focusAreas:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       202:
+ *         description: Essay grading queued
+ */
+router.post('/grade', essayController.gradeEssay);
 
 router.get('/:jobId', essayController.getAnalysis);
 

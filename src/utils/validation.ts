@@ -46,14 +46,6 @@ export const quizCreateSchema = z.object({
   isPublic: z.boolean().optional(),
 });
 
-export const flashcardCreateSchema = z.object({
-  title: z.string().min(1),
-  cards: z.array(z.object({
-    front: z.string().min(1),
-    back: z.string().min(1),
-  })),
-});
-
 export const studyTaskCreateSchema = z.object({
   title: z.string().min(1),
   details: z.string().optional(),
