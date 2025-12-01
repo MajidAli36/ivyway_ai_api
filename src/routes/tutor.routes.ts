@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as tutorController from '../controllers/tutor.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authenticateOptional } from '../middlewares/auth.middleware';
+import { checkQuota } from '../middlewares/quota.middleware';
 import { tutorMessageSchema } from '../utils/validation';
 
 const router = Router();
@@ -149,15 +150,19 @@ router.get('/conversations/:conversationId', authenticate, async (req, res, next
  *                 jobId:
  *                   type: string
  */
-router.post('/conversations/:conversationId/message', authenticate, async (req, res, next) => {
-  try {
-    const data = tutorMessageSchema.parse(req.body);
-    req.body = data;
-    await tutorController.sendMessage(req as any, res);
-  } catch (error) {
-    next(error);
+router.post('/conversations/:conversationId/message', 
+  authenticateOptional, 
+  checkQuota,
+  async (req, res, next) => {
+    try {
+      const data = tutorMessageSchema.parse(req.body);
+      req.body = data;
+      await tutorController.sendMessage(req as any, res);
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 export { router as tutorRouter };
 

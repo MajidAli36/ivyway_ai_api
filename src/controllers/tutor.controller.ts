@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as tutorService from '../services/tutor.service';
+import * as subscriptionService from '../services/subscription.service';
 
 export async function createConversation(req: AuthRequest, res: Response): Promise<void> {
   const userId = req.user!.userId;
@@ -30,9 +31,20 @@ export async function getMessages(req: AuthRequest, res: Response): Promise<void
 }
 
 export async function sendMessage(req: AuthRequest, res: Response): Promise<void> {
-  const userId = req.user!.userId;
+  const userId = req.user?.userId || null;
+  const deviceId = req.headers['x-device-id'] as string | undefined || null;
   const { conversationId } = req.params;
   const { content, language, subject, grade } = req.body;
+
+  // For guest users, we need to handle conversation creation differently
+  // For now, guest users can't create conversations - they'll need to sign up
+  if (!userId) {
+    res.status(401).json({ 
+      error: 'Authentication required',
+      message: 'Please sign in to continue using the AI tutor.'
+    });
+    return;
+  }
 
   const result = await tutorService.sendMessage(
     userId, 
@@ -42,6 +54,22 @@ export async function sendMessage(req: AuthRequest, res: Response): Promise<void
     subject,
     grade
   );
-  res.status(201).json(result);
+
+  // Track the request
+  await subscriptionService.trackRequest(userId, deviceId, 'tutor');
+
+  // Get updated quota info
+  const quotaCheck = await subscriptionService.checkQuota(userId, deviceId);
+
+  res.status(201).json({
+    ...result,
+    quota: {
+      remaining: quotaCheck.remaining,
+      limit: quotaCheck.limit,
+      shouldShowSoftPrompt: quotaCheck.shouldShowSoftPrompt,
+      shouldShowHardPaywall: quotaCheck.shouldShowHardPaywall,
+      message: quotaCheck.message,
+    },
+  });
 }
 

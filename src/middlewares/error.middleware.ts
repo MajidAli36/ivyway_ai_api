@@ -16,9 +16,9 @@ export class AppError extends Error {
 
 export function errorHandler(
   err: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   if (err instanceof ZodError) {
     const firstError = err.errors[0];
@@ -48,7 +48,7 @@ export function errorHandler(
   });
 }
 
-export function notFound(req: Request, res: Response): void {
+export function notFound(_req: Request, res: Response): void {
   res.status(404).json({ error: 'Route not found' });
 }
 

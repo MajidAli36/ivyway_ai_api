@@ -22,6 +22,8 @@ import { challengeRouter } from './routes/challenge.routes';
 import { progressRouter } from './routes/progress.routes';
 import { searchRouter } from './routes/search.routes';
 import { jobRouter } from './routes/job.routes';
+import { subscriptionRouter } from './routes/subscription.routes';
+import { paymentRouter } from './routes/payment.routes';
 
 const app = express();
 
@@ -41,9 +43,14 @@ app.use(cors({
     : true, // Allow all origins in development (for mobile apps)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-ID'],
 }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// Stripe webhook needs raw body, register it before JSON parser
+app.use('/api/payment/webhook', express.raw({ type: 'application/json' }));
+
+// JSON parser for all other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -83,6 +90,8 @@ app.use('/api/challenges', challengeRouter);
 app.use('/api/progress', progressRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/jobs', jobRouter);
+app.use('/api/subscription', subscriptionRouter);
+app.use('/api/payment', paymentRouter);
 
 // 404 handler
 app.use(notFound);

@@ -73,7 +73,7 @@ async function processTutorJob(job: Job) {
   });
 
   // Build context for LLM
-  const llmMessages: LLMMessage[] = messages.map(msg => ({
+  const llmMessages: LLMMessage[] = messages.map((msg: any) => ({
     role: msg.sender === 'user' ? 'user' : 'assistant',
     content: msg.content,
   }));

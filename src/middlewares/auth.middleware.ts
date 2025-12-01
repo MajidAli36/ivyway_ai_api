@@ -39,7 +39,47 @@ export async function authenticate(
   }
 }
 
-export function authorize(...roles: string[]) {
+/**
+ * Optional authentication - doesn't fail if no token (for guest users)
+ */
+export async function authenticateOptional(
+  req: AuthRequest,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      // No token - allow as guest
+      req.user = undefined;
+      next();
+      return;
+    }
+
+    const token = authHeader.split(' ')[1];
+    const payload = verifyAccessToken(token);
+
+    // Verify user exists
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { id: true, email: true },
+    });
+
+    if (user) {
+      req.user = { ...payload, id: user.id };
+    } else {
+      req.user = undefined;
+    }
+    
+    next();
+  } catch (error) {
+    // Invalid token - allow as guest
+    req.user = undefined;
+    next();
+  }
+}
+
+export function authorize(..._roles: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });

@@ -1,5 +1,4 @@
 import { prisma } from '../db/prisma';
-import { env } from '../config/env';
 
 export async function createJob(data: {
   type: string;

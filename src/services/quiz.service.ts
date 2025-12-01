@@ -112,18 +112,18 @@ export async function submitQuizAttempt(userId: string, quizId: string, answers:
 
     if (question.type === 'MCQ' || question.type === 'TRUE_FALSE') {
       // Get user's selected choice text
-      const userChoice = question.choices.find(c => c.id === answer.choiceId);
+      const userChoice = question.choices.find((c: any) => c.id === answer.choiceId);
       const userChoiceText = userChoice?.text || '';
       
       // First, try to find correct choice by isCorrect flag
-      let correctChoice = question.choices.find(c => c.isCorrect);
+      let correctChoice = question.choices.find((c: any) => c.isCorrect);
       
       // If question.answer field exists, use it as source of truth
       // Match the answer field with choice text to find the correct choice
       if (question.answer && question.answer.trim()) {
         const answerText = question.answer.trim();
         // Try to find a choice that matches the answer field (case-insensitive, partial match)
-        const matchingChoice = question.choices.find(c => {
+        const matchingChoice = question.choices.find((c: any) => {
           const choiceText = c.text.trim();
           // Check for exact match or if answer is contained in choice or vice versa
           return choiceText.toLowerCase() === answerText.toLowerCase() ||
@@ -190,7 +190,7 @@ export async function submitQuizAttempt(userId: string, quizId: string, answers:
       // First, try to find correct choice by matching with answer field
       if (question.answer && question.answer.trim()) {
         const answerText = question.answer.trim();
-        const matchingChoice = question.choices.find(c => {
+        const matchingChoice = question.choices.find((c: any) => {
           const choiceText = c.text.trim();
           return choiceText.toLowerCase() === answerText.toLowerCase() ||
                  choiceText.toLowerCase().includes(answerText.toLowerCase()) ||
@@ -206,7 +206,7 @@ export async function submitQuizAttempt(userId: string, quizId: string, answers:
       
       // Fallback to choice marked as isCorrect
       if (!correctChoiceText) {
-        const correctChoice = question.choices.find(c => c.isCorrect);
+        const correctChoice = question.choices.find((c: any) => c.isCorrect);
         correctChoiceText = correctChoice?.text || '';
       }
       

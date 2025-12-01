@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, AuthRequest } from '../middlewares/auth.middleware';
 import { prisma } from '../db/prisma';
 
 const router = Router();
@@ -34,15 +34,20 @@ const router = Router();
  */
 router.use(authenticate);
 
-router.get('/daily', async (req, res) => {
+router.get('/daily', async (req: AuthRequest, res) => {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
     // Get today's challenge from jobs
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const job = await prisma.job.findFirst({
       where: {
-        userId: req.user!.userId,
+        userId: req.user.userId,
         type: 'daily_challenge',
         createdAt: { gte: today },
         status: 'completed',
@@ -51,10 +56,11 @@ router.get('/daily', async (req, res) => {
     });
 
     if (!job) {
-      return res.json({ 
+      res.json({ 
         challenge: null, 
         message: 'No challenge available yet' 
       });
+      return;
     }
 
     res.json({ challenge: job.result });

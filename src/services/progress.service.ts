@@ -117,7 +117,7 @@ export async function calculateStreak(userId: string): Promise<number> {
   today.setHours(0, 0, 0, 0);
 
   // Check if today has activity
-  const todayActivity = activities.find((a) => {
+  const todayActivity = activities.find((a: any) => {
     const activityDate = new Date(a.activityDate);
     activityDate.setHours(0, 0, 0, 0);
     return activityDate.getTime() === today.getTime();
@@ -127,7 +127,7 @@ export async function calculateStreak(userId: string): Promise<number> {
     // No activity today, check yesterday
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayActivity = activities.find((a) => {
+    const yesterdayActivity = activities.find((a: any) => {
       const activityDate = new Date(a.activityDate);
       activityDate.setHours(0, 0, 0, 0);
       return activityDate.getTime() === yesterday.getTime();
@@ -292,7 +292,7 @@ export async function trackLessonCompletion(
 /**
  * Track quiz completion
  */
-export async function trackQuizCompletion(userId: string, score: number, totalPoints: number) {
+export async function trackQuizCompletion(userId: string, score: number, _totalPoints: number) {
   const xpEarned = calculateXP('quiz', score);
 
   // Update daily activity

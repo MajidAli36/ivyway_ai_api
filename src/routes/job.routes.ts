@@ -73,14 +73,20 @@ router.get('/', async (req: AuthRequest, res) => {
  */
 router.get('/:id', async (req: AuthRequest, res) => {
   const id = req.params.id;
-  const userId = req.user!.userId;
+  if (!req.user) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const userId = req.user.userId;
 
   const job = await prisma.job.findFirst({
     where: { id, userId },
   });
 
   if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
+    res.status(404).json({ error: 'Job not found' });
+    return;
   }
 
   res.json({ job });

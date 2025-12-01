@@ -42,5 +42,10 @@ export const env = {
   // Rate Limiting
   RATE_LIMIT_WINDOW: parseInt(process.env.RATE_LIMIT_WINDOW || '15'),
   RATE_LIMIT_MAX: parseInt(process.env.RATE_LIMIT_MAX || '100'),
+
+  // Stripe
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+  STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY,
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
 };
 
