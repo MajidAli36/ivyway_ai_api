@@ -48,6 +48,8 @@ model User {
   subscriptionStart DateTime?
   subscriptionEnd   DateTime?
   stripeCustomerId  String?          @unique // Stripe customer ID
+  appleId           String?          @unique // Apple Sign-In identifier (sub)
+  appleEmail        String?          // Email provided by Apple (may be hidden)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 

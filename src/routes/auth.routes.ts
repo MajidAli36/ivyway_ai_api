@@ -263,4 +263,35 @@ router.post('/guest', async (req, res, next) => {
   }
 });
 
+/**
+ * /api/auth/apple:
+ *   post:
+ *     summary: Sign in with Apple using identity token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - identityToken
+ *             properties:
+ *               identityToken:
+ *                 type: string
+ *                 description: Identity token returned from Apple Sign-In (JWT)
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Bad request
+ */
+router.post('/apple', async (req, res, next) => {
+  try {
+    await authController.loginWithApple(req as any, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 export { router as authRouter };

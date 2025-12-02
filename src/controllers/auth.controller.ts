@@ -115,3 +115,22 @@ export async function loginAsGuest(_req: AuthRequest, res: Response): Promise<vo
   });
 }
 
+export async function loginWithApple(req: AuthRequest, res: Response): Promise<void> {
+  const { identityToken } = req.body;
+  if (!identityToken || typeof identityToken !== 'string') {
+    res.status(400).json({ error: 'identityToken is required' });
+    return;
+  }
+
+  const result = await authService.loginWithApple(identityToken);
+
+  // Map fullName to name for frontend compatibility
+  res.json({
+    ...result,
+    user: {
+      ...result.user,
+      name: result.user.fullName,
+    },
+  });
+}
+

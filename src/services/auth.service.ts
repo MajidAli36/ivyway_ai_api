@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { prisma } from '../db/prisma';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError } from '../middlewares/error.middleware';
+import * as appleService from './apple.service';
 
 export async function registerUser(data: {
   email: string;
@@ -203,6 +204,77 @@ export async function loginAsGuest() {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
+    },
+    accessToken,
+    refreshToken,
+  };
+}
+
+export async function loginWithApple(idToken: string) {
+  // Verify token with Apple
+  let payload;
+  try {
+    payload = await appleService.verifyIdentityToken(idToken);
+  } catch (err) {
+    throw new AppError('Invalid Apple identity token', 401);
+  }
+
+  // `sub` is the stable Apple user identifier
+  const appleId = payload.sub;
+  const email = payload.email || null;
+
+  if (!appleId) {
+    throw new AppError('Apple token missing subject (sub)', 400);
+  }
+
+  // Try to find user by appleId first
+  let user = await prisma.user.findUnique({ where: { appleId } });
+
+  // If not found, try to find by email (Apple may share a real email)
+  if (!user && email) {
+    user = await prisma.user.findUnique({ where: { email } });
+  }
+
+  // If still not found, create a new user
+  if (!user) {
+    const generatedPassword = await bcrypt.hash(`apple-${appleId}-${Date.now()}`, 10);
+    user = await prisma.user.create({
+      data: {
+        email: email || `apple-${appleId}@apple.local`,
+        password: generatedPassword,
+        fullName: '',
+        appleId,
+        appleEmail: email || null,
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        createdAt: true,
+      },
+    });
+  } else {
+    // Update appleId/email if missing
+    const needUpdate: any = {};
+    if (!user.appleId) needUpdate.appleId = appleId;
+    if (!user.appleEmail && email) needUpdate.appleEmail = email;
+    if (Object.keys(needUpdate).length > 0) {
+      await prisma.user.update({ where: { id: user.id }, data: needUpdate });
+    }
+  }
+
+  // Sign tokens
+  const accessToken = signAccessToken({ userId: user.id, email: user.email });
+  const refreshToken = signRefreshToken({ userId: user.id, email: user.email });
+
+  // Store refresh token
+  await prisma.user.update({ where: { id: user.id }, data: { refreshToken } });
+
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: (user as any).fullName || '',
     },
     accessToken,
     refreshToken,

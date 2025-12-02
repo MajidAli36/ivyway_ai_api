@@ -29,6 +29,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
+    "apple-signin-auth": "^2.0.0",
     "axios": "^1.7.0",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.8.0",

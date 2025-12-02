@@ -83,7 +83,7 @@ export async function createCheckoutSession(
 
   // Create checkout session
   const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
+    payment_method_types: ['card'], // Apple Pay is supported automatically when 'card' is included
     mode: 'subscription',
     customer: customerId,
     line_items: [
